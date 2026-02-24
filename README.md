@@ -1,157 +1,191 @@
-# royalinvest-immobiler.com
-Site opérant dans le domaine de l'immobilier
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Royal Invest Immobilier</title>
+royal-invest-immobilier
+config.php
+index.php
+register.php
+login.php
+dashboard.php
+add-property.php
+properties.php
+messages.php
+admin-approve.php
+logout.php
+style.css
+database.sql
+<?php
+session_start();
 
-<style>
+$conn = new mysqli("localhost", "root", "", "royal_invest");
+
+if ($conn->connect_error) {
+    die("Connexion échouée: " . $conn->connect_error);
+}
+?>
+CREATE DATABASE royal_invest;
+USE royal_invest;
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100),
+    password VARCHAR(255),
+    role VARCHAR(20) DEFAULT 'agent'
+);
+
+CREATE TABLE properties (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200),
+    description TEXT,
+    price VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'pending',
+    user_id INT
+);
+
+CREATE TABLE messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT,
+    receiver_id INT,
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+<?php include 'config.php';
+
+if($_POST){
+    $name = $_POST['name'];
+    $email = $_POST['email'];
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+    $conn->query("INSERT INTO users (name,email,password) 
+    VALUES ('$name','$email','$password')");
+    echo "Compte créé avec succès.";
+}
+?>
+
+<form method="POST">
+<input type="text" name="name" placeholder="Nom" required>
+<input type="email" name="email" placeholder="Email" required>
+<input type="password" name="password" placeholder="Mot de passe" required>
+<button>S'inscrire</button>
+</form>
+<?php include 'config.php';
+
+if($_POST){
+    $email = $_POST['email'];
+    $password = $_POST['password'];
+
+    $result = $conn->query("SELECT * FROM users WHERE email='$email'");
+    $user = $result->fetch_assoc();
+
+    if(password_verify($password, $user['password'])){
+        $_SESSION['user'] = $user;
+        header("Location: dashboard.php");
+    }
+}
+?>
+
+<form method="POST">
+<input type="email" name="email" placeholder="Email" required>
+<input type="password" name="password" placeholder="Mot de passe" required>
+<button>Connexion</button>
+</form>
+<?php include 'config.php';
+
+if(!isset($_SESSION['user'])){
+    header("Location: login.php");
+}
+?>
+
+<h2>Bienvenue <?php echo $_SESSION['user']['name']; ?></h2>
+
+<a href="add-property.php">Ajouter un bien</a> |
+<a href="properties.php">Voir les biens</a> |
+<a href="messages.php">Messagerie</a> |
+<a href="logout.php">Déconnexion</a>
+
+<?php
+if($_SESSION['user']['role'] == 'admin'){
+    echo "<br><a href='admin-approve.php'>Valider les annonces</a>";
+}
+?>
+<?php include 'config.php';
+
+if($_POST){
+    $title = $_POST['title'];
+    $description = $_POST['description'];
+    $price = $_POST['price'];
+    $user_id = $_SESSION['user']['id'];
+
+    $conn->query("INSERT INTO properties (title,description,price,user_id)
+    VALUES ('$title','$description','$price','$user_id')");
+
+    echo "Annonce envoyée en validation.";
+}
+?>
+
+<form method="POST">
+<input type="text" name="title" placeholder="Titre du bien" required>
+<textarea name="description" placeholder="Description"></textarea>
+<input type="text" name="price" placeholder="Prix">
+<button>Publier</button>
+</form>
+<?php include 'config.php';
+
+$result = $conn->query("SELECT * FROM properties WHERE status='pending'");
+
+while($row = $result->fetch_assoc()){
+    echo $row['title'] . " - 
+    <a href='?approve=".$row['id']."'>Valider</a><br>";
+}
+
+if(isset($_GET['approve'])){
+    $id = $_GET['approve'];
+    $conn->query("UPDATE properties SET status='approved' WHERE id=$id");
+    header("Location: admin-approve.php");
+}
+?>
+<?php include 'config.php';
+
+$result = $conn->query("SELECT * FROM properties WHERE status='approved'");
+
+while($row = $result->fetch_assoc()){
+    echo "<h3>".$row['title']."</h3>";
+    echo "<p>".$row['description']."</p>";
+    echo "<strong>".$row['price']."</strong><hr>";
+}
+?>
+<?php include 'config.php';
+
+if($_POST){
+    $message = $_POST['message'];
+    $sender = $_SESSION['user']['id'];
+    $receiver = 1; // ID Admin par défaut
+
+    $conn->query("INSERT INTO messages (sender_id,receiver_id,message)
+    VALUES ('$sender','$receiver','$message')");
+}
+
+$result = $conn->query("SELECT * FROM messages");
+
+while($row = $result->fetch_assoc()){
+    echo "<p>".$row['message']."</p>";
+}
+?>
+
+<form method="POST">
+<textarea name="message"></textarea>
+<button>Envoyer</button>
+</form>
 body{
-    margin:0;
-    font-family:Arial, sans-serif;
+    font-family: Arial;
     background:#f4f6f9;
 }
-header{
+
+button{
     background:#0d2c6c;
     color:white;
-    padding:15px 30px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+    padding:10px 15px;
+    border:none;
 }
-header h1{
-    margin:0;
-    font-size:20px;
-}
-nav a{
-    color:white;
-    margin-left:15px;
-    text-decoration:none;
-    font-weight:bold;
-}
-.hero{
-    background:url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c') no-repeat center/cover;
-    color:white;
-    text-align:center;
-    padding:120px 20px;
-}
-.hero h2{
-    font-size:38px;
-}
-.btn{
-    background:#d4af37;
-    padding:12px 25px;
-    color:white;
-    text-decoration:none;
-    border-radius:5px;
-}
-.section{
-    padding:60px 20px;
-    text-align:center;
-}
-.cards{
-    display:flex;
-    justify-content:center;
-    flex-wrap:wrap;
-    gap:20px;
-}
-.card{
-    background:white;
-    width:300px;
-    border-radius:10px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.1);
-    overflow:hidden;
-}
-.card img{
-    width:100%;
-    height:200px;
-    object-fit:cover;
-}
-.card h3{
-    margin:10px 0 5px;
-}
-.card p{
-    margin-bottom:15px;
-}
-.contact{
-    background:#0d2c6c;
-    color:white;
-    padding:40px;
-}
-footer{
-    background:#00153a;
-    color:white;
-    text-align:center;
-    padding:15px;
-}
-</style>
-</head>
 
-<body>
-
-<header>
-<h1>👑 Royal Invest Immobilier</h1>
-<nav>
-<a href="#">Accueil</a>
-<a href="#vente">Vente</a>
-<a href="#location">Location</a>
-<a href="#contact">Contact</a>
-</nav>
-</header>
-
-<section class="hero">
-<h2>Achat • Vente • Location à Kinshasa</h2>
-<p>Votre partenaire immobilier de confiance</p>
-<br>
-<a href="#contact" class="btn">Contactez-nous</a>
-</section>
-
-<section class="section" id="vente">
-<h2>Biens en Vente</h2>
-<div class="cards">
-<div class="card">
-<img src="https://images.unsplash.com/photo-1568605114967-8130f3a36994">
-<h3>Villa Moderne - Gombe</h3>
-<p>450 000 $</p>
-</div>
-<div class="card">
-<img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef">
-<h3>Parcelle - Ngaliema</h3>
-<p>80 $ / m²</p>
-</div>
-</div>
-</section>
-
-<section class="section" id="location">
-<h2>Biens en Location</h2>
-<div class="cards">
-<div class="card">
-<img src="https://images.unsplash.com/photo-1600585154526-990dced4db0d">
-<h3>Appartement Moderne</h3>
-<p>1 500 $ / mois</p>
-</div>
-<div class="card">
-<img src="https://images.unsplash.com/photo-1497366216548-37526070297c">
-<h3>Bureau en Ville</h3>
-<p>2 000 $ / mois</p>
-</div>
-</div>
-</section>
-
-<section class="contact" id="contact">
-<h2>Contact</h2>
-<p>📞 +243 813318389</p>
-<p>📧 lukombombengi@gmail.com</p>
-<p>📍 Kinshasa, RDC</p>
-<br>
-<a href="https://wa.me/243813318389" class="btn">WhatsApp</a>
-</section>
-
-<footer>
-© 2026 Royal Invest Immobilier - Tous droits réservés
-</footer>
-
-</body>
-</html>
+h2{
+    color:#0d2c6c;
+}
